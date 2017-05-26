@@ -1,0 +1,100 @@
+model {
+  # First fitting the GDP model
+  for (t in 1:n.years) {
+    gamma.tmp[t] <- gamma + (t <= 13) * gamma.pre1973
+#    frontier.change[t] ~ dnorm(gamma, tau.frontier)
+#     frontier.gdp[t+1] ~ dnorm(frontier.gdp[t] + gamma.tmp[t], tau.frontier)
+    frontier.change[t] ~ dnorm(gamma.tmp[t], tau.frontier)
+  }
+  for (p in 1:n.GoodObs) {
+    frontier.gap.new[p] ~ dnorm(frontier.gap.pred[p], tau.gap[country.gdp.inds[p]])
+    frontier.gap.pred[p] <- phi[country.gdp.inds[p]] * frontier.gap.old[p]
+  }
+  for (c in 1:n.countries.gdp) {
+    tau.gap[c] <- pow(sig.gap[c], -2)
+    sig.gap[c] ~ dlnorm(mu.ln.gap, tau.ln.gap)
+    phi[c] <- min(1, max(0, phi.tmp[c]))
+    phi.tmp[c] ~ dnorm(mu.phi, tau.phi)
+  }
+  
+  gamma.pre1973 ~ dunif(-0.1,0.1)
+  gamma ~ dunif(0,1)
+  tau.frontier <- pow(sig.frontier, -2)
+  sig.frontier ~ dlnorm(-3, 0.05)
+  mu.phi ~ dunif(0, 1)
+  tau.phi <- pow(sig.phi, -2)
+  sig.phi ~ dunif(0, 1)
+  
+  mu.ln.gap ~ dnorm(-6, 0.025)
+  tau.ln.gap <- pow(sig.ln.gap, -2)
+  sig.ln.gap  ~ dunif(0.05, 5) # log(sig.gap) varies by +/- sig.ln.gap
+
+# ==========================================
+# Now the carbon intensity part
+
+# New USA stuff =================
+  tau.eps.tmp.USA <- (1/(1-pow(rho,2))) * tau.eps.USA
+  for (t in 1:n.years) {
+# Note: the sign of (gamma - frontier.change) is the opposite of what you might
+# expect, in maintaining consistency with the other data
+# t=1 is the 1961/1960 year combo, so t=30 is 1990, when we should be at zero by centering
+    mu.tmp.USA[t] <- mu.eta * (t - 30) +
+                mu.beta * tau.old.USA[t] -
+                delta.USA + rho * 
+                (sig.eps.USA / sig.frontier) *
+                (frontier.change[t] - gamma.tmp[t])
+    tau.new.USA[t] ~ dnorm(mu.tmp.USA[t], tau.eps.tmp.USA)
+  }
+  delta.USA ~ dnorm(mu.delta, t.delta)
+#  eta.USA ~ dnorm(mu.eta, t.eta)
+#  beta.USA.tmp ~ dnorm(mu.beta, t.beta)
+#  beta.USA <- min(1, max(0, beta.USA.tmp))
+  tau.eps.USA <- pow(sig.eps.USA, -2)
+  sig.eps.USA ~ dlnorm(sig.eps.mean, sig.eps.tau)
+# End USA stuff  =================
+
+  for (c in 1:n.countries) {
+    tau.eps.tmp[c] <- (1/(1-pow(rho,2))) * tau.eps[c]
+  }
+
+  for (i in 1:n.GoodObsIntensity) {
+    p_tmp[i] <- intensity.Obs[i]
+    mu.tmp[i] <- mu.eta * (years.intensity[p_tmp[i]] - 1990) + 
+                mu.beta * tau.old[p_tmp[i]] -
+                delta[country.inds[p_tmp[i]]] + rho * 
+                (sig.eps[country.inds[p_tmp[i]]] / sig.gap[country.gdp.inds[p_tmp[i]]]) *
+                (frontier.gap.new[p_tmp[i]] - frontier.gap.pred[p_tmp[i]])
+#    tau.new[p_tmp[i]] ~ dnorm(mu.tmp[i], tau.eps.tmp[country.inds[p_tmp[i]]])
+    # use tau.new.funny.index[i] instead of tau.new[p_tmp[i]] b/c of JAGS quirk
+    tau.new.funny.index[i] ~ dnorm(mu.tmp[i], tau.eps.tmp[country.inds[p_tmp[i]]])
+  }
+  for (c in 1:n.countries) {
+    delta[c] ~ dnorm(mu.delta, t.delta)
+    #eta[c] ~ dnorm(mu.eta, t.eta)
+    #beta[c] <- min(1, max(0, beta.tmp[c]))
+    #beta.tmp[c] ~ dnorm(mu.beta, t.beta)
+    tau.eps[c] <- pow(sig.eps[c], -2)
+    sig.eps[c] ~ dlnorm(sig.eps.mean, sig.eps.tau)
+  }
+  
+  mu.delta ~ dnorm(0,1)
+  t.delta <- pow(sig.delta, -2)
+#  sig.delta ~ dlnorm(-5, 0.01)
+  sig.delta ~ dlnorm(-5, 1/(1.15^2))
+
+
+  mu.eta ~ dnorm(0, 100)
+  #t.eta <- pow(sig.eta, -2)
+  #sig.eta ~ dlnorm(-4, 0.01)
+
+  mu.beta ~ dunif(0,1)
+  #t.beta <- pow(sig.beta, -2)
+  #sig.beta ~ dlnorm(-4, 0.01)
+
+  sig.eps.mean ~ dnorm(-2, 0.01)
+  sig.eps.tau <- pow(sig.eps.sd, -2)
+  sig.eps.sd ~ dunif(0.05, 5)
+
+  # Correlation coefficient
+  rho ~ dunif(-1, 1)
+}
