@@ -30,153 +30,6 @@ library(car)
 
 #=========================================================
 
-setwd("~/UW courses/Research/CO2_Data")
-data.location <- "NatureData/"
-sims.location <- paste0(data.location, "Simulations/")
-plot.location <- "NatureData/Plots/"
-
-# Get RCP Data
-rcp.list <- list()
-for (rcp.num in c("RCP26", "RCP45", "RCP60", "RCP85")) {
-  rcp.list[[rcp.num]] <- read.csv(paste0(data.location, "IPCC_", rcp.num, "_data.csv"))
-}
-rcp.colors <- c("green", "red", "black", "purple")
-
-rcp.carbon.yearly.tmp <- read.csv(paste0(data.location, "rcp_db_carbon_emissions.csv"),
-                                  nrows=4)
-rcp.carbon.yearly <- rcp.carbon.yearly.tmp[, c("Scenario", "Unit",
-                                               paste0("X", c(2000, 2005, seq(2010, 2100, by=10))))]
-rcp.carbon.yearly[, -c(1,2)] <- (11/3) * rcp.carbon.yearly[, -c(1,2)]
-rcp.carbon.yearly$Unit <- rep("PgCO2/yr", 4)
-names(rcp.carbon.yearly) <- gsub("X", "Carbon", names(rcp.carbon.yearly))
-rcp.carbon.yearly$Scenario <- c("RCP6.0", "RCP4.5", "RCP2.6", "RCP8.5")
-
-rcp.carbon.cum <- rcp.carbon.yearly[, c("Scenario", "Unit",
-                                        paste0("Carbon", seq(2010, 2100, by=10)))]
-carbon.cum <- rep(0, 4)
-for (year in seq(2010, 2100, by=10)) {
-  var.name.tmp <- paste0("Carbon", year)
-  if (year == 2010) {
-    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
-    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
-  } else if (year == 2100) {
-    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
-    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
-  } else {
-    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
-    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
-    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
-  }
-}
-print(xtable(rcp.carbon.cum), include.rownames=F)
-print(xtable(rcp.carbon.yearly), include.rownames=F)
-
-# RCP 8.5, yearly worldwide emissions of CO2 (fossil fuels and industry).
-# From https://tntcat.iiasa.ac.at/AR5DB/dsd?Action=htmlpage&page=regions
-# Converting to gigatonnes of carbon
-rcp.8.5.yearly <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
-                             Carbon=c(29227.000, 32727.200, 42304.533, 50743.000, 61550.867, 74083.533, 86519.400, 95194.733, 100489.033, 103901.233, 105380.367)
-                             / ((11/3) * 10^3))
-# Starting RCP 8.5 from 2010
-rcp.8.5.cumulative <- data.frame(Year=c(2010, seq(2015, 2095, by=10), 2100),
-                                 Carbon=NA)
-cum.emissions.tmp <- 0
-rcp.8.5.cumulative$Carbon[1] <- 0
-cum.emissions.tmp <- 5*rcp.8.5.yearly$Carbon[2] # 2010 emissions until 2015
-rcp.8.5.cumulative$Carbon[2] <- cum.emissions.tmp
-# add on 5 years for 2010 start
-for (i in 3:dim(rcp.8.5.cumulative)[1]) {
-  if (rcp.8.5.cumulative$Year[i] == 2100) {
-    cum.emissions.tmp <- cum.emissions.tmp + 5*rcp.8.5.yearly$Carbon[i]
-  } else {
-    cum.emissions.tmp <- cum.emissions.tmp + 10*rcp.8.5.yearly$Carbon[i]
-  }
-  rcp.8.5.cumulative$Carbon[i] <- cum.emissions.tmp
-}
-
-# RCP 8.5 GDP data, in billions of 2005USD per year
-rcp.8.5.yearly.gdp <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
-                                 GDP=c(42987.656, 48302.922, 63588.657, 83849.204, 110376.903, 139114.084, 165405.548, 190946.622, 215806.785, 239972.143, 262928.537))
-# RCP 8.5 Tech data, tonnes of carbon per $10,000
-rcp.8.5.yearly.tech <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
-                                  Tech=(rcp.8.5.yearly$Carbon / rcp.8.5.yearly.gdp$GDP * 10^4))
-# RCP 8.5 Population data, in millions of people in a year
-rcp.8.5.pop <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
-                          PopTotal=c(6469.985, 6884.830, 7814.060, 8712.230, 9548.040, 10245.410, 10864.550, 11392.090, 11847.140, 12202.210, 12386.320))
-
-# OECD world GDP forecasts, taken from https://data.oecd.org/gdp/gdp-long-term-forecast.htm
-# In millions of USD per year (2010USD)
-oecd.gdp.tmp <- read.csv(paste0(data.location, "oecd_worldgdp_forecast.csv"),
-                         sep=",", stringsAsFactors=FALSE)
-oecd.gdp <- oecd.gdp.tmp[, c("TIME", "Value")]
-names(oecd.gdp) <- c("Year", "GDP")
-oecd.gdp$GDP <- as.numeric(oecd.gdp$GDP)
-
-# Load dataset:
-load(file=paste0(data.location, "data_medium.Rda"))
-
-
-# For help in calling the plot function for different countries
-countrylist <- as.character(unique(data.medium$Isocode))
-isolist <- countrycode(sourcevar=countrylist, origin="iso3c", destination="country.name")
-cbind(countrylist, isolist)
-
-getIso <- function(country) {
-  library(countrycode)
-  # take the first element in case we have a vector of strings
-  if (nchar(country[1]) == 3) return(country)
-  else return(countrycode(sourcevar=country, origin="country.name", destination="iso3c"))
-}
-
-getCountry <- function(iso) {
-  library(countrycode)
-  # take the first element in case we have a vector of strings
-  if (nchar(iso[1]) > 3) return(iso)
-  else return(countrycode(sourcevar=iso, origin="iso3c", destination="country.name"))
-}
-
-countries.isos <- unique(data.medium$Isocode)
-
-
-countries.eu <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", 
-                  "Czech Republic", "Denmark", "Estonia", "Finland", "France", 
-                  "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia",
-                  "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland",
-                  "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", 
-                  "Sweden", "United Kingdom")
-isos.eu <- sapply(countries.eu, getIso)
-
-rcp.5region.tmp <- read.csv(paste0(data.location, 'rcp_db_5regions.csv'),
-                            nrows=20)
-rcp.5region <- rcp.5region.tmp[, c("Region", "Scenario", "Unit",
-                                   paste0("X", c(2000, 2005, seq(2010, 2100, by=10))))]
-names(rcp.5region) <- gsub("X", "Carbon", names(rcp.5region))
-rcp.5region[,-c(1:3)] <- (11/3) * rcp.5region[,-c(1:3)]
-rcp.5region$Unit <- "PgCO2/yr"
-rcp.5region.names <- c("ASIA", "LAM", "MAF", "OECD", "REF")
-
-# World population data:
-library(wpp2015)
-data(UNlocations)
-UNlocations$Isocode <- sapply(as.character(UNlocations$name), getIso)
-
-
-#=========================================================
-
-
-oecd.world.iso <- c("AUS", "AUT", "BEL", "BRA", "CAN", "CHE", "CHL", "CHN",
-                    "CZE", "DEU", "DNK", "ESP", "EST", "FIN", "FRA",
-                    "GBR", "GRC", "HUN", "IDN", "IND", "IRL", "ISL", "ISR",
-                    "ITA", "JPN", "KOR", "LUX", "MEX", "NLD", "NOR", "NZL",
-                    "POL", "PRT", "RUS", "SVK", "SVN", "SWE", "TUR",
-                    "USA", "ZAF")
-oecd.world.minusoecd15 <- c("BRA", "CHN", "IDN", "IND", "RUS", "ZAF")
-oecd.15.iso <- oecd.world.iso[! oecd.world.iso %in% oecd.world.minusoecd15]
-
-
-#=========================================================
-
-
 find_maxes <- function(data.medium, plot.countries=FALSE) {
   # find_maxes finds when each country peaks in carbon intensity.
   # If the peak for a country is within the last 5 years of the data,
@@ -213,7 +66,7 @@ find_maxes <- function(data.medium, plot.countries=FALSE) {
     year.last <- max(data.medium$Year) # Allow for out-of-sample validation
     year.last.cutoff <- min(2003, year.last - 5)
     if (1965 <= data.tmp$Year[max.ind] & 
-          data.tmp$Year[max.ind] <= year.last.cutoff) {
+        data.tmp$Year[max.ind] <= year.last.cutoff) {
       max.vals[["Iso"]] <- c(max.vals[["Iso"]], iso)
       max.vals[["GDP"]] <- c(max.vals[["GDP"]], data.tmp$GDP[max.ind])
       max.vals[["Tech"]] <- c(max.vals[["Tech"]], data.tmp$Tech[max.ind])
@@ -257,76 +110,6 @@ find_maxes <- function(data.medium, plot.countries=FALSE) {
   
   list(max.vals, rejects.early, rejects.late, rejects.insuf)
 }
-
-#==========================================
-
-
-# Sub-Saharan Africa
-ssa.countries <- c("Angola", "Benin", "Botswana",
-  "Burkina Faso", "Burundi", "Cameroon", "Cape Verde", "Central African Republic",
-  "Chad", "Comoros", "Congo, Republic of", "Congo, the Democratic Republic of the", "C么te d'Ivoire",
-  "Djibouti", "Equatorial Guinea", "Eritrea", "Ethiopia", "Gabon", "The Gambia", "Ghana",
-  "Guinea", "Guinea-Bissau", "Kenya", "Lesotho", "Liberia", "Madagascar", "Malawi", "Mali",
-  "Mauritania", "Mauritius", "Mozambique", "Namibia", "Niger", "Nigeria", "Réunion", "Rwanda",
-  "Sao Tome and Principe", "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa", "Sudan",
-  "Swaziland", "Tanzania", "Togo", "Uganda", "Western Sahara", "Zambia", "Zimbabwe")
-ssa.isos <- getIso(ssa.countries)
-
-
-get.rcp.region.isos <- function(countries.str) {
-  # get.rcp.region.isos splits a string of countries, gets isocodes
-  library(countrycode)
-  return(sapply(strsplit(countries.str, ", "), getIso))
-}
-
-
-# IPCC RCP regions
-#OECD90 = Includes the OECD 90 countries, therefore encompassing the countries included in the regions Western Europe (Austria, Belgium, Denmark, Finland, France, Germany, Greece, Iceland, Ireland, Italy, Luxembourg, Netherlands, Norway, Portugal, Spain, Sweden, Switzerland, Turkey, United Kingdom), Northern America (Canada, United States of America) and Pacific OECD (Australia, Fiji, French Polynesia, Guam, Japan, New Caledonia, New Zealand, Samoa, Solomon Islands, Vanuatu) .
-oecd.90.countries.str <- "Austria, Belgium, Denmark, Finland, France, Germany, Greece, Iceland, Ireland, Italy, Luxembourg, Netherlands, Norway, Portugal, Spain, Sweden, Switzerland, Turkey, United Kingdom, Canada, United States of America, Australia, Fiji, French Polynesia, Guam, Japan, New Caledonia, New Zealand, Samoa, Solomon Islands, Vanuatu"
-oecd.90.iso <- get.rcp.region.isos(oecd.90.countries.str)
-#REF = Countries from the Reforming Ecomonies region (Albania, Armenia, Azerbaijan, Belarus, Bosnia and Herzegovina, Bulgaria, Croatia, Cyprus, Czech Republic, Estonia, Georgia, Hungary, Kazakhstan, Kyrgyzstan, Latvia, Lithuania, Malta, Poland, Republic of Moldova, Romania, Russian Federation, Slovakia, Slovenia, Tajikistan, TFYR Macedonia, Turkmenistan, Ukraine, Uzbekistan, Yugoslavia).
-ref.countries.str <- "Albania, Armenia, Azerbaijan, Belarus, Bosnia and Herzegovina, Bulgaria, Croatia, Cyprus, Czech Republic, Estonia, Georgia, Hungary, Kazakhstan, Kyrgyzstan, Latvia, Lithuania, Malta, Poland, Republic of Moldova, Romania, Russian Federation, Slovakia, Slovenia, Tajikistan, TFYR Macedonia, Turkmenistan, Ukraine, Uzbekistan, Yugoslavia"
-ref.iso <- get.rcp.region.isos(ref.countries.str)
-#ASIA = The countries included in the regions China + (China, China Hong Kong SAR, China Macao SAR, Mongolia, Taiwan) , India + (Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, Sri Lanka) and Rest of Asia (Brunei Darussalam, Cambodia, Democratic People's Republic of Korea, East Timor, Indonesia, Lao People's Democratic Republic, Malaysia, Myanmar, Papua New Guinea, Philippines, Republic of Korea, Singapore, Thailand, Viet Nam) are aggregated into this region.
-asia.countries.str <- "China, China Hong Kong SAR, China Macao SAR, Mongolia, Taiwan, India, Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, Sri Lanka, Brunei Darussalam, Cambodia, Democratic People's Republic of Korea, East Timor, Indonesia, Lao People's Democratic Republic, Malaysia, Myanmar, Papua New Guinea, Philippines, Republic of Korea, Singapore, Thailand, Viet Nam"
-asia.iso <- get.rcp.region.isos(asia.countries.str)
-#MAF = This region includes the Middle East (Bahrain, Iran (Islamic Republic of), Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syrian Arab Republic, United Arab Emirates, Yemen) and African (Algeria, Angola, Benin, Botswana, Burkina Faso, Burundi, Cote d'Ivoire, Cameroon, Cape Verde, Central African Republic, Chad, Comoros, Congo, Democratic Republic of the Congo, Djibouti, Egypt, Equatorial Guinea, Eritrea, Ethiopia, Gabon, Gambia, Ghana, Guinea, Guinea-Bissau, Kenya, Lesotho, Liberia, Libyan Arab Jamahiriya, Madagascar, Malawi, Mali, Mauritania, Mauritius, Morocco, Mozambique, Namibia, Niger, Nigeria, Reunion, Rwanda, Senegal, Sierra Leone, Somalia, South Africa, Sudan, Swaziland, Togo, Tunisia, Uganda, United Republic of Tanzania, Western Sahara, Zambia, Zimbabwe) countries.
-maf.countries.str <- "Bahrain, Iran (Islamic Republic of), Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syrian Arab Republic, United Arab Emirates, Yemen, Algeria, Angola, Benin, Botswana, Burkina Faso, Burundi, Cote d'Ivoire, Cameroon, Cape Verde, Central African Republic, Chad, Comoros, Congo, Democratic Republic of the Congo, Djibouti, Egypt, Equatorial Guinea, Eritrea, Ethiopia, Gabon, Gambia, Ghana, Guinea, Guinea-Bissau, Kenya, Lesotho, Liberia, Libyan Arab Jamahiriya, Madagascar, Malawi, Mali, Mauritania, Mauritius, Morocco, Mozambique, Namibia, Niger, Nigeria, Reunion, Rwanda, Senegal, Sierra Leone, Somalia, South Africa, Sudan, Swaziland, Togo, Tunisia, Uganda, United Republic of Tanzania, Western Sahara, Zambia, Zimbabwe"
-maf.iso <- get.rcp.region.isos(maf.countries.str)
-#LAM = This region includes the Latin American countries (Argentina, Bahamas, Barbados, Belize, Bolivia, Brazil, Chile, Colombia, Costa Rica, Cuba, Dominican Republic, Ecuador, El Salvador, Guadeloupe, Guatemala, Guyana, Haiti, Honduras, Jamaica, Martinique, Mexico, Netherlands Antilles, Nicaragua, Panama, Paraguay, Peru, Puerto Rico, Suriname, Trinidad and Tobago, Uruguay, Venezuela). 
-lam.countries.str <- "Argentina, Bahamas, Barbados, Belize, Bolivia, Brazil, Chile, Colombia, Costa Rica, Cuba, Dominican Republic, Ecuador, El Salvador, Guadeloupe, Guatemala, Guyana, Haiti, Honduras, Jamaica, Martinique, Mexico, Netherlands Antilles, Nicaragua, Panama, Paraguay, Peru, Puerto Rico, Suriname, Trinidad and Tobago, Uruguay, Venezuela"
-lam.iso <- get.rcp.region.isos(lam.countries.str)
-
-
-oecd.world.minusoecd90 <- oecd.world.iso[! oecd.world.iso %in% oecd.90.iso]
-
-reg.5.dataframe <- data.frame(Isocode=c(oecd.90.iso, ref.iso, asia.iso, maf.iso, lam.iso),
-                              Reg5=c(rep("OECD", length(oecd.90.iso)),
-                                     rep("REF", length(ref.iso)),
-                                     rep("ASIA", length(asia.iso)),
-                                     rep("MAF", length(maf.iso)),
-                                     rep("LAM", length(lam.iso))))
-
-rcp.5region.names <- c("ASIA", "LAM", "MAF", "OECD", "REF")
-rcp.5region.names.altorder <- c("OECD", "ASIA", "LAM", "MAF", "REF")
-
-
-# Note: we're just ignoring missing data here, which is just a few countries.
-olddata.5region <- data.frame(Region=rcp.5region.names)
-for (year in 1960:2010) {
-  var.name <- paste0("Carbon", year)
-  olddata.5region[, var.name] <- rep(NA, 5)
-  i.row <- 0
-  for (reg in rcp.5region.names) {
-    i.row <- i.row + 1
-    reg.isos <- subset(reg.5.dataframe, Reg5 == reg)$Isocode
-    data.tmp <- subset(data.medium, Isocode %in% reg.isos & Year == year)
-    olddata.5region[i.row, var.name] <- sum(data.tmp$CO2 * data.tmp$PopTotal * 1000,
-                                            na.rm=T)
-  }
-}
-
-
 
 #==========================================
 
@@ -465,66 +248,6 @@ find.pop.trajectories <- function(data.medium, pred.pop, n.trajs, isos,
   
   preds.countries
 }
-
-
-
-
-
-year.start <- 2010
-year.end <- 2100
-preds.countries.tmp.1980 <- predict.population(year.present=year.start, year.end=year.end,
-                                          make.new=TRUE)
-pred.pop <- preds.countries.tmp.1980$pred.pop
-n.trajectories <- 1000
-names.countries.tmp <- as.character(unique(subset(data.medium, Isocode != "USA")$Isocode))
-preds.countries.trajs <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
-                                               c("USA", names.countries.tmp), year.start=year.start, year.end=year.end)
-save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_1980_2010.rda"))
-load(paste0(data.location, "poppreds_formatted_2010_2100.rda"))
-
-n.trajectories.larger <- 3125
-preds.countries.trajs.larger <- find.pop.trajectories(data.medium, pred.pop, n.trajectories.larger,
-                                               c("USA", names.countries.tmp), year.start=year.start, year.end=year.end)
-save(preds.countries.trajs.larger, file=paste0(data.location, "poppreds_formatted_2010_2100_larger.rda"))
-load(paste0(data.location, "poppreds_formatted_2010_2100_larger.rda"))
-
-preds.countries.tmp.2000 <- predict.population(year.present=2000, year.end=2010,
-                                          make.new=TRUE)
-pred.pop.2000 <- preds.countries.tmp.2000$pred.pop
-#preds.countries.trajs.2000 <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
-preds.countries.trajs.2000 <- find.pop.trajectories(data.medium, pred.pop.2000, n.trajectories,
-                                                    c("USA", names.countries.tmp),
-                                                    year.start=2000, year.end=2010)
-preds.countries.trajs <- preds.countries.trajs.2000
-#save(preds.countries.trajs.2000, file=paste0(data.location, "poppreds_formatted_2000_2010.rda"))
-save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_2000_2010.rda"))
-#preds.countries.trajs.1990 <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
-preds.countries.tmp.1990 <- predict.population(year.present=1990, year.end=2010,
-                                          make.new=TRUE)
-pred.pop.1990 <- preds.countries.tmp.1990$pred.pop
-preds.countries.trajs.1990 <- find.pop.trajectories(data.medium, pred.pop.1990, n.trajectories,
-                                                    c("USA", names.countries.tmp),
-                                                    #year.start=1990, year.end=2010)
-                                                    year.start=1990, year.end=2010)
-#save(preds.countries.trajs.1990, file=paste0(data.location, "poppreds_formatted_1990_2010.rda"))
-save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_1990_2010.rda"))
-#preds.countries.trajs.1980 <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
-#preds.countries.tmp <- predict.population(year.present=1980, year.end=2100,
-preds.countries.tmp <- predict.population(year.present=1980, year.end=2010,
-                                          make.new=FALSE)
-pred.pop <- preds.countries.tmp$pred.pop
-preds.countries.trajs <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
-                                               c("USA", names.countries.tmp),
-                                               #year.start=1980, year.end=2010)
-                                               year.start=1980, year.end=2010)
-#save(preds.countries.trajs.1980, file=paste0(data.location, "poppreds_formatted_1980_2010.rda"))
-save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_1990_2010.rda"))
-#rm(preds.countries.trajs)
-#rm(pred.pop)
-
-# ======================================
-
-
 
 convert.projections <- function(tech.projections.log, 
                                 gdp.projections.log, frontier.projections.log,
@@ -1158,7 +881,7 @@ project.corr.ar1.const <- function(data.medium, input.data, jags.corr.output, ye
   gdp.data.tmp <- cbind(gdp.data.tmp2, t(rep(NA, (year.last - year.first))))
   names(gdp.data.tmp) <- c("Isocode", paste0("LogGDP", year.first:year.last))
   gdp.data.tmp[, 2] <- log(gdp.data.tmp[, 2])
-
+  
   # Create base GDP frontier data:
   stopifnot(all(gdp.data.tmp$Isocode == names.countries.gdp))
   stopifnot(! "USA" %in% names.countries.gdp)
@@ -1274,9 +997,9 @@ project.corr.ar1.const <- function(data.medium, input.data, jags.corr.output, ye
         for (year in 2009:2010) {
           print("Doing special 2009, 2010 stuff for USA")
           gdp.frontier.copy[, paste0("LogGDP", year)] <- log(subset(data.medium, Isocode == "USA" &
-                                                             Year == year)$GDP)
+                                                                      Year == year)$GDP)
           tech.USA.copy[, paste0("LogTech", year)] <- log(subset(data.medium, Isocode == "USA" &
-                                                             Year == year)$Tech)
+                                                                   Year == year)$Tech)
         }
         for (year in 2009:2010) {
           print("Doing special 2009, 2010 stuff for non-USA countries")
@@ -1289,7 +1012,7 @@ project.corr.ar1.const <- function(data.medium, input.data, jags.corr.output, ye
           tech.name.old <- paste0("LogTech", year.old)
           counter <- 0
           while (counter == 0 ||
-                   (max(tech.data.copy[, tech.name.now], na.rm=T) > log(50))) {
+                 (max(tech.data.copy[, tech.name.now], na.rm=T) > log(50))) {
             counter <- 1
             # Project other countries GDP
             gdp.epsilon <- rnorm(n.countries.gdp, 0, sig.gap)
@@ -1320,7 +1043,7 @@ project.corr.ar1.const <- function(data.medium, input.data, jags.corr.output, ye
           
           # Intensity
           log.tech.data.tmp <- log(subset(data.medium, Year == year & 
-                                           Isocode %in% names.countries.gdp)[, "Tech"])
+                                            Isocode %in% names.countries.gdp)[, "Tech"])
           which.have.tech.data <- ! is.na(log.tech.data.tmp)
           # Replace simulated values with observed values
           tech.data.copy[which.have.tech.data, tech.name.now] <- log.tech.data.tmp[which.have.tech.data]        
@@ -1335,13 +1058,13 @@ project.corr.ar1.const <- function(data.medium, input.data, jags.corr.output, ye
         tech.name.old <- paste0("LogTech", year.old)
         counter <- 0
         while (counter == 0 ||
-                 (max(tech.data.copy[, tech.name.now], na.rm=T) > log(50))) {
+               (max(tech.data.copy[, tech.name.now], na.rm=T) > log(50))) {
           #counter <- 1
           counter <- counter + 1
           if (counter > 1) {
             tech.data.copy[, tech.name.now] <- sapply(tech.data.copy[, tech.name.now],
-                function(x) min(x, log(50))
-              )
+                                                      function(x) min(x, log(50))
+            )
             break
           }
           stopifnot(counter < 10)
@@ -1611,7 +1334,7 @@ evaluate.projections <- function(data.medium.full, model.results,
     })
     preds.countries.trajs <- lapply(model.results$preds.countries.trajs,
                                     function(x)
-      subset(x, Isocode %in% isos.include))
+                                      subset(x, Isocode %in% isos.include))
     co2.projections <- lapply(model.results$co2.projections, function(x)
       subset(x, Isocode %in% isos.include))
   }
@@ -2060,7 +1783,268 @@ evaluate.projections <- function(data.medium.full, model.results,
   }
 }
 
+# ==========================================
 
+setwd("/path/to/working/directory")
+data.location <- "NatureData/"
+sims.location <- paste0(data.location, "Simulations/")
+plot.location <- "NatureData/Plots/"
+
+# Get RCP Data
+rcp.list <- list()
+for (rcp.num in c("RCP26", "RCP45", "RCP60", "RCP85")) {
+  rcp.list[[rcp.num]] <- read.csv(paste0(data.location, "IPCC_", rcp.num, "_data.csv"))
+}
+rcp.colors <- c("green", "red", "black", "purple")
+
+rcp.carbon.yearly.tmp <- read.csv(paste0(data.location, "rcp_db_carbon_emissions.csv"),
+                                  nrows=4)
+rcp.carbon.yearly <- rcp.carbon.yearly.tmp[, c("Scenario", "Unit",
+                                               paste0("X", c(2000, 2005, seq(2010, 2100, by=10))))]
+rcp.carbon.yearly[, -c(1,2)] <- (11/3) * rcp.carbon.yearly[, -c(1,2)]
+rcp.carbon.yearly$Unit <- rep("PgCO2/yr", 4)
+names(rcp.carbon.yearly) <- gsub("X", "Carbon", names(rcp.carbon.yearly))
+rcp.carbon.yearly$Scenario <- c("RCP6.0", "RCP4.5", "RCP2.6", "RCP8.5")
+
+rcp.carbon.cum <- rcp.carbon.yearly[, c("Scenario", "Unit",
+                                        paste0("Carbon", seq(2010, 2100, by=10)))]
+carbon.cum <- rep(0, 4)
+for (year in seq(2010, 2100, by=10)) {
+  var.name.tmp <- paste0("Carbon", year)
+  if (year == 2010) {
+    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
+    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
+  } else if (year == 2100) {
+    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
+    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
+  } else {
+    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
+    rcp.carbon.cum[, var.name.tmp] <- carbon.cum
+    carbon.cum <- carbon.cum + 5*rcp.carbon.yearly[, var.name.tmp]
+  }
+}
+print(xtable(rcp.carbon.cum), include.rownames=F)
+print(xtable(rcp.carbon.yearly), include.rownames=F)
+
+# RCP 8.5, yearly worldwide emissions of CO2 (fossil fuels and industry).
+# From https://tntcat.iiasa.ac.at/AR5DB/dsd?Action=htmlpage&page=regions
+# Converting to gigatonnes of carbon
+rcp.8.5.yearly <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
+                             Carbon=c(29227.000, 32727.200, 42304.533, 50743.000, 61550.867, 74083.533, 86519.400, 95194.733, 100489.033, 103901.233, 105380.367)
+                             / ((11/3) * 10^3))
+# Starting RCP 8.5 from 2010
+rcp.8.5.cumulative <- data.frame(Year=c(2010, seq(2015, 2095, by=10), 2100),
+                                 Carbon=NA)
+cum.emissions.tmp <- 0
+rcp.8.5.cumulative$Carbon[1] <- 0
+cum.emissions.tmp <- 5*rcp.8.5.yearly$Carbon[2] # 2010 emissions until 2015
+rcp.8.5.cumulative$Carbon[2] <- cum.emissions.tmp
+# add on 5 years for 2010 start
+for (i in 3:dim(rcp.8.5.cumulative)[1]) {
+  if (rcp.8.5.cumulative$Year[i] == 2100) {
+    cum.emissions.tmp <- cum.emissions.tmp + 5*rcp.8.5.yearly$Carbon[i]
+  } else {
+    cum.emissions.tmp <- cum.emissions.tmp + 10*rcp.8.5.yearly$Carbon[i]
+  }
+  rcp.8.5.cumulative$Carbon[i] <- cum.emissions.tmp
+}
+
+# RCP 8.5 GDP data, in billions of 2005USD per year
+rcp.8.5.yearly.gdp <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
+                                 GDP=c(42987.656, 48302.922, 63588.657, 83849.204, 110376.903, 139114.084, 165405.548, 190946.622, 215806.785, 239972.143, 262928.537))
+# RCP 8.5 Tech data, tonnes of carbon per $10,000
+rcp.8.5.yearly.tech <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
+                                  Tech=(rcp.8.5.yearly$Carbon / rcp.8.5.yearly.gdp$GDP * 10^4))
+# RCP 8.5 Population data, in millions of people in a year
+rcp.8.5.pop <- data.frame(Year=c(2005, 2010, 2020, 2030, 2040, 2050, 2060, 2070, 2080, 2090, 2100),
+                          PopTotal=c(6469.985, 6884.830, 7814.060, 8712.230, 9548.040, 10245.410, 10864.550, 11392.090, 11847.140, 12202.210, 12386.320))
+
+# OECD world GDP forecasts, taken from https://data.oecd.org/gdp/gdp-long-term-forecast.htm
+# In millions of USD per year (2010USD)
+oecd.gdp.tmp <- read.csv(paste0(data.location, "oecd_worldgdp_forecast.csv"),
+                         sep=",", stringsAsFactors=FALSE)
+oecd.gdp <- oecd.gdp.tmp[, c("TIME", "Value")]
+names(oecd.gdp) <- c("Year", "GDP")
+oecd.gdp$GDP <- as.numeric(oecd.gdp$GDP)
+
+# Load dataset:
+load(file=paste0(data.location, "data_medium.Rda"))
+
+
+# For help in calling the plot function for different countries
+countrylist <- as.character(unique(data.medium$Isocode))
+isolist <- countrycode(sourcevar=countrylist, origin="iso3c", destination="country.name")
+cbind(countrylist, isolist)
+
+getIso <- function(country) {
+  library(countrycode)
+  # take the first element in case we have a vector of strings
+  if (nchar(country[1]) == 3) return(country)
+  else return(countrycode(sourcevar=country, origin="country.name", destination="iso3c"))
+}
+
+getCountry <- function(iso) {
+  library(countrycode)
+  # take the first element in case we have a vector of strings
+  if (nchar(iso[1]) > 3) return(iso)
+  else return(countrycode(sourcevar=iso, origin="iso3c", destination="country.name"))
+}
+
+countries.isos <- unique(data.medium$Isocode)
+
+
+countries.eu <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", 
+                  "Czech Republic", "Denmark", "Estonia", "Finland", "France", 
+                  "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia",
+                  "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland",
+                  "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", 
+                  "Sweden", "United Kingdom")
+isos.eu <- sapply(countries.eu, getIso)
+
+rcp.5region.tmp <- read.csv(paste0(data.location, 'rcp_db_5regions.csv'),
+                            nrows=20)
+rcp.5region <- rcp.5region.tmp[, c("Region", "Scenario", "Unit",
+                                   paste0("X", c(2000, 2005, seq(2010, 2100, by=10))))]
+names(rcp.5region) <- gsub("X", "Carbon", names(rcp.5region))
+rcp.5region[,-c(1:3)] <- (11/3) * rcp.5region[,-c(1:3)]
+rcp.5region$Unit <- "PgCO2/yr"
+rcp.5region.names <- c("ASIA", "LAM", "MAF", "OECD", "REF")
+
+# World population data:
+library(wpp2015)
+data(UNlocations)
+UNlocations$Isocode <- sapply(as.character(UNlocations$name), getIso)
+
+
+#=========================================================
+
+
+oecd.world.iso <- c("AUS", "AUT", "BEL", "BRA", "CAN", "CHE", "CHL", "CHN",
+                    "CZE", "DEU", "DNK", "ESP", "EST", "FIN", "FRA",
+                    "GBR", "GRC", "HUN", "IDN", "IND", "IRL", "ISL", "ISR",
+                    "ITA", "JPN", "KOR", "LUX", "MEX", "NLD", "NOR", "NZL",
+                    "POL", "PRT", "RUS", "SVK", "SVN", "SWE", "TUR",
+                    "USA", "ZAF")
+oecd.world.minusoecd15 <- c("BRA", "CHN", "IDN", "IND", "RUS", "ZAF")
+oecd.15.iso <- oecd.world.iso[! oecd.world.iso %in% oecd.world.minusoecd15]
+
+# ========================================================
+
+# Sub-Saharan Africa
+ssa.countries <- c("Angola", "Benin", "Botswana",
+                   "Burkina Faso", "Burundi", "Cameroon", "Cape Verde", "Central African Republic",
+                   "Chad", "Comoros", "Congo, Republic of", "Congo, the Democratic Republic of the", "C么te d'Ivoire",
+                   "Djibouti", "Equatorial Guinea", "Eritrea", "Ethiopia", "Gabon", "The Gambia", "Ghana",
+                   "Guinea", "Guinea-Bissau", "Kenya", "Lesotho", "Liberia", "Madagascar", "Malawi", "Mali",
+                   "Mauritania", "Mauritius", "Mozambique", "Namibia", "Niger", "Nigeria", "Réunion", "Rwanda",
+                   "Sao Tome and Principe", "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa", "Sudan",
+                   "Swaziland", "Tanzania", "Togo", "Uganda", "Western Sahara", "Zambia", "Zimbabwe")
+ssa.isos <- getIso(ssa.countries)
+
+
+get.rcp.region.isos <- function(countries.str) {
+  # get.rcp.region.isos splits a string of countries, gets isocodes
+  library(countrycode)
+  return(sapply(strsplit(countries.str, ", "), getIso))
+}
+
+
+# IPCC RCP regions
+#OECD90 = Includes the OECD 90 countries, therefore encompassing the countries included in the regions Western Europe (Austria, Belgium, Denmark, Finland, France, Germany, Greece, Iceland, Ireland, Italy, Luxembourg, Netherlands, Norway, Portugal, Spain, Sweden, Switzerland, Turkey, United Kingdom), Northern America (Canada, United States of America) and Pacific OECD (Australia, Fiji, French Polynesia, Guam, Japan, New Caledonia, New Zealand, Samoa, Solomon Islands, Vanuatu) .
+oecd.90.countries.str <- "Austria, Belgium, Denmark, Finland, France, Germany, Greece, Iceland, Ireland, Italy, Luxembourg, Netherlands, Norway, Portugal, Spain, Sweden, Switzerland, Turkey, United Kingdom, Canada, United States of America, Australia, Fiji, French Polynesia, Guam, Japan, New Caledonia, New Zealand, Samoa, Solomon Islands, Vanuatu"
+oecd.90.iso <- get.rcp.region.isos(oecd.90.countries.str)
+#REF = Countries from the Reforming Ecomonies region (Albania, Armenia, Azerbaijan, Belarus, Bosnia and Herzegovina, Bulgaria, Croatia, Cyprus, Czech Republic, Estonia, Georgia, Hungary, Kazakhstan, Kyrgyzstan, Latvia, Lithuania, Malta, Poland, Republic of Moldova, Romania, Russian Federation, Slovakia, Slovenia, Tajikistan, TFYR Macedonia, Turkmenistan, Ukraine, Uzbekistan, Yugoslavia).
+ref.countries.str <- "Albania, Armenia, Azerbaijan, Belarus, Bosnia and Herzegovina, Bulgaria, Croatia, Cyprus, Czech Republic, Estonia, Georgia, Hungary, Kazakhstan, Kyrgyzstan, Latvia, Lithuania, Malta, Poland, Republic of Moldova, Romania, Russian Federation, Slovakia, Slovenia, Tajikistan, TFYR Macedonia, Turkmenistan, Ukraine, Uzbekistan, Yugoslavia"
+ref.iso <- get.rcp.region.isos(ref.countries.str)
+#ASIA = The countries included in the regions China + (China, China Hong Kong SAR, China Macao SAR, Mongolia, Taiwan) , India + (Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, Sri Lanka) and Rest of Asia (Brunei Darussalam, Cambodia, Democratic People's Republic of Korea, East Timor, Indonesia, Lao People's Democratic Republic, Malaysia, Myanmar, Papua New Guinea, Philippines, Republic of Korea, Singapore, Thailand, Viet Nam) are aggregated into this region.
+asia.countries.str <- "China, China Hong Kong SAR, China Macao SAR, Mongolia, Taiwan, India, Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, Sri Lanka, Brunei Darussalam, Cambodia, Democratic People's Republic of Korea, East Timor, Indonesia, Lao People's Democratic Republic, Malaysia, Myanmar, Papua New Guinea, Philippines, Republic of Korea, Singapore, Thailand, Viet Nam"
+asia.iso <- get.rcp.region.isos(asia.countries.str)
+#MAF = This region includes the Middle East (Bahrain, Iran (Islamic Republic of), Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syrian Arab Republic, United Arab Emirates, Yemen) and African (Algeria, Angola, Benin, Botswana, Burkina Faso, Burundi, Cote d'Ivoire, Cameroon, Cape Verde, Central African Republic, Chad, Comoros, Congo, Democratic Republic of the Congo, Djibouti, Egypt, Equatorial Guinea, Eritrea, Ethiopia, Gabon, Gambia, Ghana, Guinea, Guinea-Bissau, Kenya, Lesotho, Liberia, Libyan Arab Jamahiriya, Madagascar, Malawi, Mali, Mauritania, Mauritius, Morocco, Mozambique, Namibia, Niger, Nigeria, Reunion, Rwanda, Senegal, Sierra Leone, Somalia, South Africa, Sudan, Swaziland, Togo, Tunisia, Uganda, United Republic of Tanzania, Western Sahara, Zambia, Zimbabwe) countries.
+maf.countries.str <- "Bahrain, Iran (Islamic Republic of), Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syrian Arab Republic, United Arab Emirates, Yemen, Algeria, Angola, Benin, Botswana, Burkina Faso, Burundi, Cote d'Ivoire, Cameroon, Cape Verde, Central African Republic, Chad, Comoros, Congo, Democratic Republic of the Congo, Djibouti, Egypt, Equatorial Guinea, Eritrea, Ethiopia, Gabon, Gambia, Ghana, Guinea, Guinea-Bissau, Kenya, Lesotho, Liberia, Libyan Arab Jamahiriya, Madagascar, Malawi, Mali, Mauritania, Mauritius, Morocco, Mozambique, Namibia, Niger, Nigeria, Reunion, Rwanda, Senegal, Sierra Leone, Somalia, South Africa, Sudan, Swaziland, Togo, Tunisia, Uganda, United Republic of Tanzania, Western Sahara, Zambia, Zimbabwe"
+maf.iso <- get.rcp.region.isos(maf.countries.str)
+#LAM = This region includes the Latin American countries (Argentina, Bahamas, Barbados, Belize, Bolivia, Brazil, Chile, Colombia, Costa Rica, Cuba, Dominican Republic, Ecuador, El Salvador, Guadeloupe, Guatemala, Guyana, Haiti, Honduras, Jamaica, Martinique, Mexico, Netherlands Antilles, Nicaragua, Panama, Paraguay, Peru, Puerto Rico, Suriname, Trinidad and Tobago, Uruguay, Venezuela). 
+lam.countries.str <- "Argentina, Bahamas, Barbados, Belize, Bolivia, Brazil, Chile, Colombia, Costa Rica, Cuba, Dominican Republic, Ecuador, El Salvador, Guadeloupe, Guatemala, Guyana, Haiti, Honduras, Jamaica, Martinique, Mexico, Netherlands Antilles, Nicaragua, Panama, Paraguay, Peru, Puerto Rico, Suriname, Trinidad and Tobago, Uruguay, Venezuela"
+lam.iso <- get.rcp.region.isos(lam.countries.str)
+
+
+oecd.world.minusoecd90 <- oecd.world.iso[! oecd.world.iso %in% oecd.90.iso]
+
+reg.5.dataframe <- data.frame(Isocode=c(oecd.90.iso, ref.iso, asia.iso, maf.iso, lam.iso),
+                              Reg5=c(rep("OECD", length(oecd.90.iso)),
+                                     rep("REF", length(ref.iso)),
+                                     rep("ASIA", length(asia.iso)),
+                                     rep("MAF", length(maf.iso)),
+                                     rep("LAM", length(lam.iso))))
+
+rcp.5region.names <- c("ASIA", "LAM", "MAF", "OECD", "REF")
+rcp.5region.names.altorder <- c("OECD", "ASIA", "LAM", "MAF", "REF")
+
+
+# Note: we're just ignoring missing data here, which is just a few countries.
+olddata.5region <- data.frame(Region=rcp.5region.names)
+for (year in 1960:2010) {
+  var.name <- paste0("Carbon", year)
+  olddata.5region[, var.name] <- rep(NA, 5)
+  i.row <- 0
+  for (reg in rcp.5region.names) {
+    i.row <- i.row + 1
+    reg.isos <- subset(reg.5.dataframe, Reg5 == reg)$Isocode
+    data.tmp <- subset(data.medium, Isocode %in% reg.isos & Year == year)
+    olddata.5region[i.row, var.name] <- sum(data.tmp$CO2 * data.tmp$PopTotal * 1000,
+                                            na.rm=T)
+  }
+}
+
+#========================================================
+
+year.start <- 2010
+year.end <- 2100
+n.trajectories <- 1000
+
+preds.countries.tmp <- predict.population(year.present=year.start, year.end=year.end,
+                                               make.new=TRUE)
+pred.pop <- preds.countries.tmp$pred.pop
+names.countries.tmp <- as.character(unique(subset(data.medium, Isocode != "USA")$Isocode))
+preds.countries.trajs <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
+                                               c("USA", names.countries.tmp), year.start=year.start, year.end=year.end)
+save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_2010_2100.rda"))
+load(paste0(data.location, "poppreds_formatted_2010_2100.rda"))
+
+n.trajectories.larger <- 3125
+preds.countries.trajs.larger <- find.pop.trajectories(data.medium, pred.pop, n.trajectories.larger,
+                                                      c("USA", names.countries.tmp), year.start=year.start, year.end=year.end)
+save(preds.countries.trajs.larger, file=paste0(data.location, "poppreds_formatted_2010_2100_larger.rda"))
+load(paste0(data.location, "poppreds_formatted_2010_2100_larger.rda"))
+
+preds.countries.tmp.2000 <- predict.population(year.present=2000, year.end=2010,
+                                               make.new=TRUE)
+pred.pop.2000 <- preds.countries.tmp.2000$pred.pop
+
+preds.countries.trajs.2000 <- find.pop.trajectories(data.medium, pred.pop.2000, n.trajectories,
+                                                    c("USA", names.countries.tmp),
+                                                    year.start=2000, year.end=2010)
+
+save(preds.countries.trajs.2000, file=paste0(data.location, "poppreds_formatted_2000_2010.rda"))
+
+preds.countries.tmp.1990 <- predict.population(year.present=1990, year.end=2010,
+                                               make.new=TRUE)
+pred.pop.1990 <- preds.countries.tmp.1990$pred.pop
+preds.countries.trajs.1990 <- find.pop.trajectories(data.medium, pred.pop.1990, n.trajectories,
+                                                    c("USA", names.countries.tmp),
+                                                    year.start=1990, year.end=2010)
+save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_1990_2010.rda"))
+
+preds.countries.tmp <- predict.population(year.present=1980, year.end=2010,
+                                          make.new=TRUE)
+pred.pop <- preds.countries.tmp$pred.pop
+preds.countries.trajs <- find.pop.trajectories(data.medium, pred.pop, n.trajectories,
+                                               c("USA", names.countries.tmp),
+                                               #year.start=1980, year.end=2010)
+                                               year.start=1980, year.end=2010)
+
+save(preds.countries.trajs, file=paste0(data.location, "poppreds_formatted_1980_2010.rda"))
+#rm(preds.countries.trajs)
+#rm(pred.pop)
 
 # =======================================
 
@@ -2076,8 +2060,7 @@ model.ar1.const.results.2000 <- fit.project.model(data.medium, year.start=2000,
 save(model.ar1.const.results.2000, file=paste0(data.location, "model_results_ar1const_2000.rda"))
 load(file=paste0(data.location, "model_results_ar1const_2000.rda"))
 model.ar1.const.results.1990 <- fit.project.model(data.medium, year.start=1990,
-#                                                  year.end=2010, fit.ar1.const=T)
-                                                  year.end=2100, fit.ar1.const=T)
+                                                  year.end=2010, fit.ar1.const=T)
 save(model.ar1.const.results.1990, file=paste0(data.location, "model_results_ar1const_1990.rda"))
 #load(file=paste0(data.location, "model_results_ar1const_1990.rda"))
 pct <- proc.time()
@@ -2118,9 +2101,8 @@ proj.evals.1980.ar1.const <- evaluate.projections(data.medium, model.ar1.const.r
 save(proj.evals.1980.ar1.const, file=paste0(data.location, "proj_evals_ar1const_1980.rda"))
 load(file=paste0(data.location, "proj_evals_ar1const_1980.rda"))
 
+# ==============================================================
 
-
-# ============================================
 table.result <- as.data.frame(model.ar1.const.results.2010$corr.model.out[[2]][[1]])
 table.result <- table.result[,c('gamma','mu.phi', 'sig.phi', 'sig.frontier', 'mu.ln.gap', 'sig.ln.gap',
                                 'mu.beta', 'mu.eta', 'mu.delta', 'sig.delta', 'sig.eps.mean', 'sig.eps.sd', 'rho')]
@@ -2558,7 +2540,7 @@ plot.ipat.projections <- function(ipat.quants,
     # Plot the variable name
     if (var.log == "logGDPpercapita") {
       var.print <- "GDP per
-capita"
+      capita"
     } else if (var.log == "logTech") {
       var.print <- "Intensity"
     } else {
@@ -2674,6 +2656,19 @@ dev.off()
 # =========================================
 
 # For getting numbers we use in the paper
+
+getCountry(as.character(subset(data.medium, Year == 2010 & GDP > 30000)$Isocode))
+subset(data.medium, Year == 2010 & GDP > 30000)[, c("Isocode", "Country", "Tech")]
+
+subset(data.medium, Year == 2008 & Tech < 1.3)[, c("Isocode", "Country", "Tech", "GDP")]
+dim(subset(data.medium, Year == 2008 & Tech < 1.3)[, c("Isocode", "Country", "Tech", "GDP")])
+sum(subset(data.medium, Year == 2008 & Tech < 1.3)$GDP < 4000)
+
+subset(data.medium, Year == 2008 & Tech > 5)[, c("Isocode", "Country", "Tech", "GDP")]
+dim(subset(data.medium, Year == 2008 & Tech > 5)[, c("Isocode", "Country", "Tech", "GDP")])
+
+
+#=========================================================
 
 getCountry(as.character(subset(data.medium, Year == 2010 & GDP > 30000)$Isocode))
 subset(data.medium, Year == 2010 & GDP > 30000)[, c("Isocode", "Country", "Tech")]
@@ -2819,7 +2814,7 @@ summarize.ipat.country <- function(data.medium, ipat.components.bycountry,
          xlab="Year", ylab=ylab.name,
          xaxs="i")
   }
-
+  
   for (q in quants.names) {
     if (q == "0.5") {
       lty=1
@@ -2897,13 +2892,13 @@ plot.5region.co2 <- function(co2.5regions, co2.5regions.quants,
     # Plot IPCC RCPs
     rcp.col.ind <- 0
     for (scenario in c("RCP2.6", "RCP4.5", "RCP6.0", "RCP8.5")) {
-     rcp.col.ind <- rcp.col.ind + 1
-     rcp.col <- rcp.colors[rcp.col.ind]
-     row.ind <- which(rcp.5region.tmp$Scenario == scenario)
-     years.tmp <- c(2000, 2005, seq(2010, 2100, by=10))
-     vars.tmp <- paste0("Carbon", years.tmp)
-     data.scenario <- data.frame(Year = years.tmp, CO2 = as.numeric(rcp.5region.tmp[row.ind, vars.tmp]))
-     plot.obj <- plot.obj + geom_line(data = data.scenario, aes(Year, CO2), color = rcp.col, size = 1.3)
+      rcp.col.ind <- rcp.col.ind + 1
+      rcp.col <- rcp.colors[rcp.col.ind]
+      row.ind <- which(rcp.5region.tmp$Scenario == scenario)
+      years.tmp <- c(2000, 2005, seq(2010, 2100, by=10))
+      vars.tmp <- paste0("Carbon", years.tmp)
+      data.scenario <- data.frame(Year = years.tmp, CO2 = as.numeric(rcp.5region.tmp[row.ind, vars.tmp]))
+      plot.obj <- plot.obj + geom_line(data = data.scenario, aes(Year, CO2), color = rcp.col, size = 1.3)
     }
     
     ggplot.list[[num_screen]] <- plot.obj
@@ -2961,7 +2956,7 @@ plot.5region.co2.back <- function(co2.5regions, co2.5regions.quants,
       geom_ribbon(aes(x=Year, ymin=Quantiles0.025, ymax=Quantiles0.975), data=region.toplot,
                   alpha=0.2, fill='blue') +
       geom_line(data=region.toplot, aes(x=Year, y=Quantiles0.5,
-                                    color='Projection'),
+                                        color='Projection'),
                 alpha=1, size=1.3, color='blue')
     #browser()
     # Plot historical data
@@ -3148,7 +3143,6 @@ plot.5region.co2.back(proj.evals.1980.ar1.const$co2.5regions,
                       save.plots=T)
 
 
-
 ##################################################################
 #  Analysis based on Figure SPM.5 of AR5 Summary Report	 #
 ##################################################################
@@ -3221,7 +3215,7 @@ library(scales) # My older version of ggplot2 doesn't have alpha()
 temp.inc.plot <- ggplot(tempinc.spm5.data, aes(x=tempinc.spm5)) + 
   geom_histogram(alpha=0.5, binwidth=0.25, fill=color.hist, color=alpha(color.hist, 1)) +
   ylab("Count (out of 100,000)") +
-  xlab("Temperature change relative to 1861-1880 (掳C)") +
+  xlab(expression(paste("Temperature change relative to 1861-1880 (", ~degree~C, ")"))) +
   theme(panel.background=element_rect(fill="white"),
         panel.grid.minor=element_line(color="white"),
         panel.grid.major=element_line(color="grey90")) +
@@ -3252,407 +3246,6 @@ dev.off()
 
 
 
-#==========================================
-
-fit.project.model.larger.tmp <- function(data.medium, year.start=2010, year.end=2100,
-                              fit.ar1.const=F, n.trajectories=n.trajectories.larger) {
-  # fit.project.model.larger.tmp is like fit.project.model, but with some modifications to use
-  # more trajectories without rerunning everything (3125 instead of 1000). Look for
-  # "TEMPORARY!!! Changed from original" to see where code is changed from fit.project.model
-  
-  # fit.project.model fits the models and generates forward projections.
-  # It uses population predictions already calculated above, calls fit.corr.model.ar1
-  # to fit the model for GDP and intensity, and calls project.corr.ar1.const
-  # to get projections for GDP and intensity.
-  # It then has to combine the population, GDP, and intensity projections.
-  
-  library(rjags)
-  library(coda)
-  library(reshape2)
-  data.medium.tmp <- subset(data.medium, Year <= year.start)
-  
-  
-  # Calling find_maxes() from find_max.R
-  print("======================================")
-  print("Find max intensities using find_max.R")
-  print("")
-  maxes.countries <- find_maxes(data.medium.tmp)
-  max.vals <- maxes.countries[[1]]
-  rejects.late <- maxes.countries[[3]]
-  rejects.insuf <- maxes.countries[[4]]
-  
-  # TEMPORARY!!! Changed from original
-  #model.ar1.const.results.2010 <- fit.project.model(data.medium, fit.ar1.const=T)
-  #save(model.ar1.const.results.2010, file=paste0(data.location, "model_results_ar1const.rda"))
-  load(file=paste0(data.location, "model_results_ar1const.rda"))
-  
-  # These functions are from estimate_model_corr.R
-  print("======================================")
-  print("Fit the model! Using fit.corr.model")
-  print("")
-  n.chains <- 5
-  n.iter <- 100000
-  n.burnin <- 5000
-  thin <- 20
-  stopifnot(n.trajectories %% n.chains == 0)
-  param.indeces <- round(seq(1, floor(n.iter / thin), length.out=(n.trajectories / n.chains)))
-  year.start.tmp <- min(2008, year.start)
-  if (! fit.ar1.const) {
-    corr.model.out <- fit.corr.model(data.medium.tmp, 
-                                     isos.remove=c("USA",rejects.late, rejects.insuf), max.vals,
-                                     n.iterations=n.iter, n.adapt=n.burnin, n.chains=5,
-                                     thin=thin)
-    names.countries <- corr.model.out[[1]]$names.countries.gdp # Now we're including all countries
-    names.countries.intensity <- corr.model.out[[1]]$names.countries # For only post-peak countries
-    
-    print("======================================")
-    print("Projecting intensity and GDP using project.corr")
-    print("")
-    list.proj <- project.corr(data.medium.tmp, input.data=corr.model.out[[1]], 
-                              jags.corr.output=corr.model.out[[2]], year.range=c(year.start.tmp,year.end),
-                              param.indeces=param.indeces)
-  } else {
-    # TEMPORARY!!! Changed from original
-    # model.ar1.const.results.2010 is a local variable from loading model_results_ar1const.rda
-    corr.model.out <- model.ar1.const.results.2010$corr.model.out
-#     # can't get gamma.pre1973, b/c when pattern matching later we'd pull it out along
-#     # with gamma
-#     corr.model.out <- fit.corr.model.ar1(data.medium, 
-#                                          isos.remove=c("USA", rejects.late, rejects.insuf), max.vals,
-#                                          n.iterations=n.iter, n.adapt=n.burnin, n.chains=5,
-#                                          thin=thin,
-#                                          model.name="corr_model_ar1trend_const.bug",
-#                                          var.list=c('delta', 'sig.eps', 'mu.delta', 'sig.delta',
-#                                                     'phi', 'sig.gap', 'gamma',
-#                                                     'sig.frontier', 'mu.phi', 'sig.phi',
-#                                                     'mu.ln.gap', 'sig.ln.gap', 'sig.eps.mean','sig.eps.sd',
-#                                                     'rho',
-#                                                     'mu.eta',
-#                                                     'mu.beta',
-#                                                     'delta.USA', 'sig.eps.USA',
-#                                                     'deviance'))
-    names.countries <- corr.model.out[[1]]$names.countries.gdp # Now we're including all countries
-    names.countries.intensity <- corr.model.out[[1]]$names.countries # For only post-peak countries
-    
-    print("======================================")
-    print("Projecting intensity and GDP using project.corr")
-    print("")
-    list.proj <- project.corr.ar1.const(data.medium.tmp, input.data=corr.model.out[[1]], 
-                                        jags.corr.output=corr.model.out[[2]], year.range=c(year.start.tmp,year.end),
-                                        param.indeces=param.indeces)
-  }
-  
-  # From predict_pop.R
-  # Getting population trajectories are slow
-  print("======================================")
-  print("Fitting the population model and getting population trajectories!")
-  print("")
-  if (year.start == 2010 & year.end == 2100) {
-    # TEMPORARY!!! Changed from original
-    load(paste0(data.location, "poppreds_formatted_2010_2100_larger.rda"))
-    
-#    # gives preds.countries.trajs
-#    load(paste0(data.location, "poppreds_formatted_2010_2100.rda"))
-  } else if (year.start == 2000 & year.end == 2010) {
-    load(paste0(data.location, "poppreds_formatted_2000_2010.rda"))
-  } else {
-    preds.countries.tmp <- predict.population(year.present=year.start, year.end=year.end, 
-                                              make.new=FALSE)
-    #                                            n.iter=500, n.burnin=100)
-    print("Have grabbed population model fit.")
-    preds.countries <- preds.countries.tmp$preds.countries
-    pred.pop <- preds.countries.tmp$pred.pop
-    print(paste0("Converting format of population trajectories, selecting first ", 
-                 n.trajectories, " trajectories."))
-    preds.countries.trajs <- find.pop.trajectories(data.medium.tmp, pred.pop, 1:n.trajectories,
-                                                   c("USA", names.countries), year.start=year.start, year.end=year.end)
-  }
-  
-  # These functions are from estimate_model_corr.R
-  print("======================================")
-  print("Combining IPAT projections using list.proj and estimate.co2.projections")
-  print("")
-  data.proj <- lapply(list.proj, function(x) convert.projections(x$TechData, 
-                                                                 x$GDPData, x$GDPFrontier, x$TechUSA))
-  co2.projections.tmp <- lapply(1:length(data.proj), function(i) {
-    x <- data.proj[[i]]
-    # TEMPORARY!!! Changed from original
-    preds.countries <- preds.countries.trajs.larger[[i]]
-#    preds.countries <- preds.countries.trajs[[i]]
-    estimate.co2.projections(x$TechData, x$GDPData, x$GDPFrontier, x$TechUSA,
-                             preds.countries, year.range=c(year.start, year.end))
-  })
-  
-  if (year.end == 2100) {
-    co2.projections.restrictions <- sapply(co2.projections.tmp, is.carbon.below.limit)
-    co2.projections <- co2.projections.tmp[co2.projections.restrictions]
-    data.proj.restrict <- data.proj[co2.projections.restrictions]
-    # TEMPORARY!!! Changed from original
-    preds.countries.trajs.restrict <- preds.countries.trajs.larger[co2.projections.restrictions]
-#    preds.countries.trajs.restrict <- preds.countries.trajs[co2.projections.restrictions]
-  } else {
-    co2.projections.restrictions <- 1:n.trajectories
-    co2.projections <- co2.projections.tmp
-    data.proj.restrict <- data.proj
-    preds.countries.trajs.restrict <- preds.countries.trajs
-  }
-  
-  list(corr.model.out=corr.model.out, 
-       data.proj=data.proj.restrict,
-       preds.countries.trajs=preds.countries.trajs.restrict,
-       co2.projections=co2.projections,
-       co2.projections.restrictions=co2.projections.restrictions,
-       names.countries.intensity=names.countries.intensity)
-}
-
-
-model.ar1.const.results.2010.larger <- fit.project.model.larger.tmp(data.medium, fit.ar1.const=T)
-#save(model.ar1.const.results.2010.larger, file=paste0(data.location, "model_results_ar1const_larger.rda"))
-#load(file=paste0(data.location, "model_results_ar1const_larger.rda"))
-
-
-proj.evals.2010.ar1.const.larger <- evaluate.projections(data.medium, model.ar1.const.results.2010.larger,
-                                                  year.start=2010, year.end=2100,
-                                                  outofsample.validate=F,
-                                                  quantiles=c(0.025, 0.05, 0.5, 0.95, 0.975))
-
-
-# cum.emissions.2100 is an array of cumulative emissions in 2100, for the different trajectories
-cum.emissions.2100.larger <- proj.evals.2010.ar1.const.larger$cum.emissions[,19]
-#load ("cum_emissions_2100.Rda")  	# Posterior distribution of 2100 cumCO2
-spm5 <- read.csv(paste0(data.location, "ipcc_ar5_temp_FigSPM5.csv"))
-#spm5 <- read.csv ("ipcc_ar5_temp_FigSPM5.csv")
-spm5[10,1] <- spm5[10,1] * 1000		# That one value was in different units
-cumco2.spm5 <- spm5[,1]
-templower.spm5 <- spm5[,2]
-tempupper.spm5 <- spm5[1:7,3]
-templower.splinefun <- splinefun (x=cumco2.spm5, y=templower.spm5, 
-                                  method="hyman")
-tempupper.splinefun <- splinefun (x=cumco2.spm5[1:7], y=tempupper.spm5,
-                                  method="hyman")
-
-# Plot the spline functions
-co2 <- seq (1010,8950,by=100)
-templower <- templower.splinefun (co2)
-tempupper <- tempupper.splinefun (co2)
-tempmean <- (templower+tempupper)/2
-# pdf(file=paste0(plot.location, "SPM5rangeExtrapolated.pdf"))
-# matplot (co2,cbind(templower,tempmean,tempupper),lty=c(2,1,2),type="l",
-#          col=c("red","black","red"), main="Figure SPM.5 extrapolated",
-#          xlab="Cumulative CO2 emissions", ylab="Temperature increase to 2100" )
-# dev.off ()
-
-# Find posterior distribution of temperature increase
-# Note: posterior distribution is in gt 2010-2100
-#  Figure SPM.5 is in cumulative CO2 emissions since 1861-1880
-# From AR5 summary, p.10, emissions to 2011 were about 1900.
-
-# ====================
-# What if we don't have any randomness in the temperature reaction?
-
-nsim <- length(cum.emissions.2100.larger)
-cumco2.post <- cum.emissions.2100.larger * (10^(-9)) + 1900 # Convert to gt 1870-2100.
-tempinc.spm5.det <- rep (NA, nsim)
-for (k in 1:nsim) {
-  co2 <- cumco2.post[k]
-  co2 <- min (co2, 8950)  # 8950 is the upper bound of cum C02 in Figure SPM.5.
-  templower <- templower.splinefun(co2)
-  tempupper <- tempupper.splinefun(co2)
-  tempmean <- (templower + tempupper)/2
-  tempsd <- (tempupper - templower)/3.28
-#  temp <- rnorm (n.sims.pertraj, tempmean, tempsd)
-  temp <- tempmean
-  ind.init <- (k-1)*n.sims.pertraj + 1
-  tempinc.spm5.det[k] <- temp
-}
-# Almost no scenarios have 'deterministic' temperature change below
-# 2 degrees (when I ran this out of 3120 scenarios, exactly one did).
-hist(tempinc.spm5.det)
-mean(tempinc.spm5.det < 2)
-#[1] 0.0003205128
-# ====================
-
-# What if we look at temperature changes based on emissions up to a certain year?
-
-get.temp.change.yearly <- function(proj.evals.2010.ar1.const.larger) {
-  years.tmp <- seq(2010, 2100, by=5)
-  tempinc.spm5 <- list()
-  for (i in 1:length(years.tmp)) {
-    year.tmp <- years.tmp[i]
-    cum.emissions.tmp <- proj.evals.2010.ar1.const.larger$cum.emissions[, i]
-    
-    nsim <- length(cum.emissions.tmp)
-    cumco2.post <- cum.emissions.tmp * (10^(-9)) + 1900 # Convert to gt 1870-2100.
-    tempinc.spm5[[as.character(year.tmp)]] <- rep (NA, nsim)
-    n.sims.pertraj <- 100
-    for (k in 1:nsim) {
-      co2 <- cumco2.post[k]
-      co2 <- min (co2, 8950)  # 8950 is the upper bound of cum C02 in Figure SPM.5.
-      templower <- templower.splinefun(co2)
-      tempupper <- tempupper.splinefun(co2)
-      tempmean <- (templower + tempupper)/2
-      tempsd <- (tempupper - templower)/3.28
-      temp <- rnorm (n.sims.pertraj, tempmean, tempsd)
-      ind.init <- (k-1)*n.sims.pertraj + 1
-      tempinc.spm5[[as.character(year.tmp)]][ind.init:(ind.init+n.sims.pertraj-1)] <- temp
-    }
-    cat(years.tmp[i], '\n')
-  }
-  
-  return(tempinc.spm5)
-}
-
-tempinc.spm5.yearly <- get.temp.change.yearly(proj.evals.2010.ar1.const.larger)
-
-prop.temp.below2degrees <- data.frame(Year=seq(2010, 2100, by=5))
-prop.temp.below2degrees$PropBelow2Deg <- NA
-i.tmp <- 0
-for (year in as.character(seq(2010, 2100, by=5))) {
-  i.tmp <- i.tmp + 1
-  print(year)
-  print(mean(tempinc.spm5.yearly[[year]] < 2))
-  prop.temp.below2degrees$PropBelow2Deg[i.tmp] <- mean(tempinc.spm5.yearly[[year]] < 2)
-  
-  png(paste0(plot.location, "Responses/", "temp_", year, ".png"))
-  hist(tempinc.spm5.yearly[[year]], xlim=c(0,7), breaks=seq(-1,11,0.2),
-       main=paste0("Histogram of temp. change for emissions up to ", year),
-       xlab="Temperature increase (deg. Celsius)")
-  dev.off()
-}
-library(xtable)
-print(xtable(prop.temp.below2degrees), include.rownames=F)
-
-# ====================
-
-
-
-nsim <- length(cum.emissions.2100.larger)
-cumco2.post <- cum.emissions.2100.larger * (10^(-9)) + 1900 # Convert to gt 1870-2100.
-tempinc.spm5 <- rep (NA, nsim)
-n.sims.pertraj <- 100
-for (k in 1:nsim) {
-  co2 <- cumco2.post[k]
-  co2 <- min (co2, 8950)  # 8950 is the upper bound of cum C02 in Figure SPM.5.
-  templower <- templower.splinefun(co2)
-  tempupper <- tempupper.splinefun(co2)
-  tempmean <- (templower + tempupper)/2
-  tempsd <- (tempupper - templower)/3.28
-  temp <- rnorm (n.sims.pertraj, tempmean, tempsd)
-  ind.init <- (k-1)*n.sims.pertraj + 1
-  tempinc.spm5[ind.init:(ind.init+n.sims.pertraj-1)] <- temp
-}
-hist(tempinc.spm5)
-
-
-inds.2degrees <- ceiling(which(abs(tempinc.spm5 - 2) < 0.1) / 100)
-
-#sum(abs(tempinc.spm5 - 1.5) < 0.1)
-inds.1.5degrees <- ceiling(which(abs(tempinc.spm5 - 1.5) < 0.1) / 100)
-
-
-names(model.ar1.const.results.2010.larger)
-names(proj.evals.2010.ar1.const.larger)
-var.vals.2degrees <- list()
-for (var.tmp in c("Tech", "GDPpercapita")) {
-  var.vals.2degrees[[var.tmp]] <- sapply(inds.2degrees, function(i.tmp) {
-      proj.evals.2010.ar1.const.larger$trajs.worldwide[[i.tmp]][19, var.tmp]
-    })
-}
-hist(var.vals.2degrees[["Tech"]])
-quantile(var.vals.2degrees[["Tech"]], c(0.025, 0.05, 0.5, 0.95, 0.975))
-
-var.vals.1.5degrees <- list()
-for (var.tmp in c("Tech", "GDPpercapita")) {
-  var.vals.1.5degrees[[var.tmp]] <- sapply(inds.1.5degrees, function(i.tmp) {
-    proj.evals.2010.ar1.const.larger$trajs.worldwide[[i.tmp]][19, var.tmp]
-  })
-}
-
-var.vals.full <- list()
-for (var.tmp in c("Tech", "GDPpercapita")) {
-  var.vals.full[[var.tmp]] <- sapply(1:length(proj.evals.2010.ar1.const.larger$trajs.worldwide),
-    function(i.tmp) {
-      proj.evals.2010.ar1.const.larger$trajs.worldwide[[i.tmp]][19, var.tmp]
-    })
-}
-
-
-proj.evals.2010.ar1.const.larger$ipat.quantiles[["0.5"]]
-
-# TODO: make the scatterplots I talked about with Adrian
-
-library(car)
-help(ellipse)
-# colors from colorbrewer
-#1b9e77
-#d95f02
-#7570b3
-#pdf(paste0(plot.location, "meeting_reduction.pdf"))
-png(paste0(plot.location, "meeting_reduction.png"))
-dataEllipse(var.vals.full[["Tech"]], var.vals.full[["GDPpercapita"]],
-            plot.points=T, add=F, cex=0.1,
-            ylab="GDP per capita", xlab="Carbon Intensity",
-            levels=c(0.9, 0.95),
-            xlim=c(0,2), ylim=c(0,150000), col="#1b9e77")
-dataEllipse(var.vals.2degrees[["Tech"]], var.vals.2degrees[["GDPpercapita"]],
-            plot.points=T, add=T, cex=0.1,
-            levels=c(0.9, 0.95),
-            col="#d95f02")
-dataEllipse(var.vals.1.5degrees[["Tech"]], var.vals.1.5degrees[["GDPpercapita"]],
-            plot.points=T, add=T, cex=0.1,
-            levels=c(0.9, 0.95),
-            col="#7570b3")
-dev.off()
-png(paste0(plot.location, "meeting_reduction_all.png"))
-dataEllipse(var.vals.full[["Tech"]], var.vals.full[["GDPpercapita"]],
-            plot.points=T, add=F, cex=0.1,
-            ylab="GDP per capita", xlab="Carbon Intensity",
-            main="All projections",
-            levels=c(0.9, 0.95),
-            xlim=c(0,2), ylim=c(0,150000),
-            col="#1b9e77")
-dev.off()
-png(paste0(plot.location, "meeting_reduction_2deg.png"))
-dataEllipse(var.vals.2degrees[["Tech"]], var.vals.2degrees[["GDPpercapita"]],
-            plot.points=T, add=F, cex=0.1,
-            ylab="GDP per capita", xlab="Carbon Intensity",
-            main="Projections with 2 degrees of temperature change",
-            levels=c(0.9, 0.95),
-            xlim=c(0,2), ylim=c(0,150000),
-            col="#d95f02")
-dev.off()
-png(paste0(plot.location, "meeting_reduction_15deg.png"))
-dataEllipse(var.vals.1.5degrees[["Tech"]], var.vals.1.5degrees[["GDPpercapita"]],
-            plot.points=T, add=F, cex=0.1,
-            ylab="GDP per capita", xlab="Carbon Intensity",
-            main="Projections with 1.5 degrees of temperature change",
-            levels=c(0.9, 0.95),
-            xlim=c(0,2), ylim=c(0,150000),
-            col="#d95f02")
-dev.off()
-
-
-library(MASS)
-contours.all <- kde2d(var.vals.full[["Tech"]], var.vals.full[["GDPpercapita"]])
-contours.2deg <- kde2d(var.vals.2degrees[["Tech"]], var.vals.2degrees[["GDPpercapita"]])
-contours.1.5deg <- kde2d(var.vals.1.5degrees[["Tech"]], var.vals.1.5degrees[["GDPpercapita"]])
-png(paste0(plot.location, "meeting_reduction_contours_all.png"))
-filled.contour(contours.all, nlevels=20, xlim=c(0,2), ylim=c(0, 200000),
-               main="All scenarios", xlab="Intensity", ylab="GDP")
-dev.off()
-png(paste0(plot.location, "meeting_reduction_contours_2deg.png"))
-filled.contour(contours.2deg, nlevels=20, xlim=c(0,2), ylim=c(0, 200000),
-               main="2 degrees scenarios", xlab="Intensity", ylab="GDP")
-dev.off()
-png(paste0(plot.location, "meeting_reduction_contours_15deg.png"))
-filled.contour(contours.1.5deg, nlevels=20, xlim=c(0,2), ylim=c(0, 200000),
-               main="1.5 degrees scenarios", xlab="Intensity", ylab="GDP")
-dev.off()
-image(contours.1.5deg, levels=c(0.9,0.95))
-contour(contours.1.5deg, levels=c(0.1, 0.9,0.95), add=T)
-contour(contours.1.5deg, levels=c(0, 0.05, 0.1, 0.2, 0.4))
-
-
 #=======================================
 # Probability of INDC targets being achieved under our model
 #=======================================
@@ -3661,8 +3254,8 @@ contour(contours.1.5deg, levels=c(0, 0.05, 0.1, 0.2, 0.4))
 # Emissions peaking by 2030
 
 china.co2.max.years <- sapply(1:n.trajectories, function(i.tmp) {
-    which.max(proj.evals.2010.ar1.const$ipat.components.bycountry[[i.tmp]][["CHN"]][, "CO2"])
-  })
+  which.max(proj.evals.2010.ar1.const$ipat.components.bycountry[[i.tmp]][["CHN"]][, "CO2"])
+})
 ind.2030.tmp <- which(proj.evals.2010.ar1.const$ipat.components.bycountry[[1]][["CHN"]][, "Year"] == 2030)
 # 25% of the trajectories have China's peak CO2 emissions by 2030
 mean(china.co2.max.years <= ind.2030.tmp)
@@ -3768,7 +3361,7 @@ base.usa.2005.tmp <- subset(data.medium, Year == 2005 & Isocode == "USA")$CO2 *
 is.usa.meeting.reduction <- sapply(1:n.trajectories, function(i.tmp) {
   usa.2025.val.tmp <- proj.evals.2010.ar1.const$ipat.components.bycountry[[i.tmp]][["USA"]][ind.2025.tmp, "CO2"]
   return(usa.2025.val.tmp < (1-.26) * base.usa.2005.tmp)
-#  return(usa.2025.val.tmp <  base.usa.2005.tmp)
+  #  return(usa.2025.val.tmp <  base.usa.2005.tmp)
 })
 # The USA meets its commitment of 26% in 0.7% of our trajectories
 mean(is.usa.meeting.reduction)
@@ -3807,13 +3400,13 @@ eu.1990.co2.tmp <- sum(data.eu.tmp$CO2 * (1000 * data.eu.tmp$PopTotal))
 # we don't have Cyprus, Luxembourg, or Malta in our dataset
 isos.eu.indata <- isos.eu[isos.eu %in% unique(data.medium$Isocode)]
 is.eu.meeting.reduction <- sapply(1:n.trajectories, function(i.tmp) {
-    co2.eu.total.2030 <- 0
-    for (iso.tmp in isos.eu.indata) {
-      co2.eu.total.2030 <- co2.eu.total.2030 +
-        proj.evals.2010.ar1.const$ipat.components.bycountry[[i.tmp]][[iso.tmp]][ind.2030.tmp, "CO2"]
-    }
-    return(co2.eu.total.2030 < (1 - .4) * eu.1990.co2.tmp)
-  })
+  co2.eu.total.2030 <- 0
+  for (iso.tmp in isos.eu.indata) {
+    co2.eu.total.2030 <- co2.eu.total.2030 +
+      proj.evals.2010.ar1.const$ipat.components.bycountry[[i.tmp]][[iso.tmp]][ind.2030.tmp, "CO2"]
+  }
+  return(co2.eu.total.2030 < (1 - .4) * eu.1990.co2.tmp)
+})
 # The EU is meeting its reduction goals in none of our scenarios
 mean(is.eu.meeting.reduction)
 #[1] 0
@@ -3849,7 +3442,7 @@ get.eu.projections.2030 <- function(n.trajectories,
     co2.eu.total.quant[,i.tmp] <- quantile(co2.eu.total[,i.tmp], probs=quantiles)
   }
   
-#  return(co2.eu.total)
+  #  return(co2.eu.total)
   return(co2.eu.total.quant)
 }
 
@@ -4040,97 +3633,7 @@ dev.off()
 
 
 #========================================================
-# Checking correlation between population model residuals and
-# intensity and GDP model residuals
 
-# based on correlations_models.R
-
-
-find.pop.model.cor <- function(model.ar1.const.results.old, year.start) {
-  n.trajs <- length(model.ar1.const.results.old$data.proj)
-  stopifnot(year.start < 2010)
-  years.seq <- seq(year.start + 5, 2010, by=5)
-  # First row of population trajectories is the United States
-  stopifnot(model.ar1.const.results.old$preds.countries.trajs[[1]]$Isocode[1] == "USA")
-  
-  # First get population residuals
-  pop.resids <- list()
-  for (year.tmp in years.seq) {
-    resids.tmp <- c()
-    varname.tmp <- paste0("Pop", year.tmp)
-    # Put the USA first so it matches up
-    popdata.this.year <- c(subset(data.medium, Isocode == "USA" & Year == year.tmp)$PopTotal,
-                           subset(data.medium, Isocode != "USA" & Year == year.tmp)$PopTotal)
-    for (traj in 1:n.trajs) {
-      resids.tmp <- c(resids.tmp,
-        model.ar1.const.results.old$preds.countries.trajs[[traj]][, varname.tmp])
-    }
-    # Make sure the projects are the right length, so things line up
-    stopifnot(length(resids.tmp) %% length(popdata.this.year) == 0)
-    # popdata.this.year gets repeated n.trajs times in this line
-    pop.resids[[as.character(year.tmp)]] <- resids.tmp - popdata.this.year
-  }
-  
-  # Now get GDP per capita residuals
-  gdp.resids <- list()
-  for (year.tmp in years.seq) {
-    resids.tmp <- c()
-    varname.tmp <- paste0("GDP", year.tmp)
-    # Put the USA first so it matches up
-    gdpdata.this.year <- c(subset(data.medium, Isocode == "USA" & Year == year.tmp)$GDP,
-                           subset(data.medium, Isocode != "USA" & Year == year.tmp)$GDP)
-    for (traj in 1:n.trajs) {
-      resids.tmp <- c(resids.tmp,
-                      model.ar1.const.results.old$data.proj[[traj]]$GDPFrontier[, varname.tmp],
-                      model.ar1.const.results.old$data.proj[[traj]]$GDPData[, varname.tmp])
-    }
-    # Make sure the projects are the right length, so things line up
-    stopifnot(length(resids.tmp) %% length(gdpdata.this.year) == 0)
-    # popdata.this.year gets repeated n.trajs times in this line
-    gdp.resids[[as.character(year.tmp)]] <- resids.tmp - gdpdata.this.year
-  }
-  
-  # Now get intensity residuals
-  tech.resids <- list()
-  for (year.tmp in years.seq) {
-    resids.tmp <- c()
-    varname.tmp <- paste0("Tech", year.tmp)
-    # Put the USA first so it matches up
-    techdata.this.year <- c(subset(data.medium, Isocode == "USA" & Year == year.tmp)$Tech,
-                           subset(data.medium, Isocode != "USA" & Year == year.tmp)$Tech)
-    for (traj in 1:n.trajs) {
-      resids.tmp <- c(resids.tmp,
-                      model.ar1.const.results.old$data.proj[[traj]]$TechUSA[, varname.tmp],
-                      model.ar1.const.results.old$data.proj[[traj]]$TechData[, varname.tmp])
-    }
-    # Make sure the projects are the right length, so things line up
-    stopifnot(length(resids.tmp) %% length(techdata.this.year) == 0)
-    # popdata.this.year gets repeated n.trajs times in this line
-    tech.resids[[as.character(year.tmp)]] <- resids.tmp - techdata.this.year
-  }
-  
-  for (year.tmp in years.seq) {
-    print("-------------")
-    print(paste0("Year: ", year.tmp))
-    print("GDP per capita and population correlation:")
-    print(cor(gdp.resids[[as.character(year.tmp)]], pop.resids[[as.character(year.tmp)]],
-              use="complete.obs"))
-    print("Intensity and population correlation:")
-    print(cor(tech.resids[[as.character(year.tmp)]], pop.resids[[as.character(year.tmp)]],
-              use="complete.obs"))
-  }
-}
-
-#model.ar1.const.results.1990
-#load(file=paste0(data.location, "model_results_ar1const_1980.rda"))
-#load(file=paste0(data.location, "model_results_ar1const_1990.rda"))
-#load(file=paste0(data.location, "model_results_ar1const_2000.rda"))
-
-find.pop.model.cor(model.ar1.const.results.1980, year.start=1980)
-find.pop.model.cor(model.ar1.const.results.1990, year.start=1990)
-find.pop.model.cor(model.ar1.const.results.2000, year.start=2000)
-
-#================================================#
 # Plots for individual countries.
 countries.toplot <- c('Brazil', 'China', 'Egypt', 'France', 'India', 'Indonesia', 'Japan', 'South Korea',
                       'Nigeria', 'Russia', 'Saudi Arabia', 'South Africa', 'Thailand', 'United Kingdom', 
@@ -4203,7 +3706,7 @@ plot.obj <- plot.obj +
   geom_ribbon(aes(x=Year, ymin=q025, ymax=q975), data=temp.inc.toplot,
               alpha=0.2, fill=color.us) +
   geom_line(data=temp.inc.toplot, aes(x=Year, y=q500,
-                                          color="Projections"),
+                                      color="Projections"),
             alpha=1, size=1.3, color=color.us)
 print(plot.obj)
 dev.off()
