@@ -32,19 +32,13 @@ proj.evals.2010.ar1.const <- evaluate.projections(data.medium, model.ar1.const.r
 
 Codes between line 2104 to 3145 are for creating plots in the paper. It includes:
 
-..* Past and Present GDP plots by countries.
-
-..* Current Carbon Intensities.
-
-..* Yearly Carbon Emissions Predictions (World and Sub-Saharan Areas).
-
-..* Cumulative Carbon Emissions Predictions (World and Sub-Saharan Areas).
-
-..* IPAT Components Projections (Intensity, Population and GDP per capita)
-
-..* Out of Sample Validations
-
-..* Projections of Carbon Emissions by Regions.
+* Past and Present GDP plots by countries.
+* Current Carbon Intensities.
+* Yearly Carbon Emissions Predictions (World and Sub-Saharan Areas).
+* Cumulative Carbon Emissions Predictions (World and Sub-Saharan Areas).
+* IPAT Components Projections (Intensity, Population and GDP per capita)
+* Out of Sample Validations
+* Projections of Carbon Emissions by Regions.
 
 Codes between line 3146 to 3248 are for modeling for temperature changes based on Figure SPM.5 of AR5 Summary Report
 
