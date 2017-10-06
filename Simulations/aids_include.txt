@@ -1,0 +1,40 @@
+"name"	"country_code"	"include_code"
+"Burundi"	108	1
+"Djibouti"	262	1
+"Ethiopia"	231	1
+"Kenya"	404	1
+"Malawi"	454	1
+"Mozambique"	508	1
+"Rwanda"	646	1
+"South Sudan"	728	1
+"Uganda"	800	1
+"United Republic of Tanzania"	834	1
+"Zambia"	894	1
+"Zimbabwe"	716	1
+"Angola"	24	1
+"Cameroon"	120	1
+"Central African Republic"	140	1
+"Chad"	148	1
+"Congo"	178	1
+"Equatorial Guinea"	226	1
+"Gabon"	266	1
+"Botswana"	72	1
+"Lesotho"	426	1
+"Namibia"	516	1
+"South Africa"	710	1
+"Swaziland"	748	1
+"Benin"	204	1
+"Burkina Faso"	854	1
+"Cote d'Ivoire"	384	1
+"Ghana"	288	1
+"Guinea"	324	1
+"Liberia"	430	1
+"Nigeria"	566	1
+"Togo"	768	1
+"Thailand"	764	1
+"Bahamas"	44	1
+"Haiti"	332	1
+"Jamaica"	388	1
+"Belize"	84	1
+"Honduras"	340	1
+"Suriname"	740	1
