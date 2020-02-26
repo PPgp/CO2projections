@@ -5,6 +5,8 @@ This code is designed for generating probabilistic CO2 projections in paper _Les
 ## Code Usage
 This code is mostly meant to be run sequentially. 
 
+Users must download and install [JAGS software](https://sourceforge.net/projects/mcmc-jags/) before running this code.
+
 For use of this code, one should load all required packages in the first 30 lines, and load all functionals in constructing the model from line 32 to 1785, including population projection, fit and project the complete model, and evaluation of prediction by summarizing statistics in projections.
 
 Users should also load lines between line 1786 to 1998 for data loading, cleaning and loading of countries.
