@@ -239,10 +239,10 @@ find.pop.trajectories <- function(data.medium, pred.pop, n.trajs, isos,
     }
     # browser()
     save(preds.countries,
-         file=paste0(sims.location, "Sims_Pop/predictions/converted_pop_", 
+         file=paste0(sims.location, "Sims_Pop_", year.start, "_", year.end, "/predictions/converted_pop_", 
                      year.start, "_", year.end, ".RDA"))
   } else {
-    load(paste0(sims.location, "Sims_Pop/predictions/converted_pop_", 
+    load(paste0(sims.location, "Sims_Pop_", year.start, "_", year.end, "/predictions/converted_pop_", 
                 year.start, "_", year.end, ".RDA"))
   }
   
@@ -1787,7 +1787,7 @@ evaluate.projections <- function(data.medium.full, model.results,
 
 setwd("/path/to/working/directory")
 data.location <- "NatureData/"
-sims.location <- paste0(data.location, "Simulations/")
+sims.location <- "Simulations/"
 plot.location <- "NatureData/Plots/"
 
 # Get RCP Data
