@@ -30,6 +30,12 @@ library(car)
 
 #=========================================================
 
+loadRData <- function(fileName){
+  #loads an RData file, and returns it
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
 find_maxes <- function(data.medium, plot.countries=FALSE) {
   # find_maxes finds when each country peaks in carbon intensity.
   # If the peak for a country is within the last 5 years of the data,
@@ -187,7 +193,7 @@ predict.population <- function(year.present=2010, year.end=2100,
   
   # 9 for pred.pop$quantiles[,9,] is the 0.5 quantile
   preds.countries <- data.frame(cbind(as.character(pred.pop$countries[,2]),
-                                      pred.pop$quantiles[,9,]),
+                                      pred.pop$quantiles[,'0.5',]),
                                 stringsAsFactors=F)
   names(preds.countries) <- c("Country", paste0("Pop", seq(year.present, year.end, by=5)))
   library(countrycode)
@@ -291,10 +297,6 @@ estimate.co2.projections <- function(tech.projections, gdp.projections,
   isos.tmp <- tech.projections$Isocode
   # Population projections match up by country with tech and GDP projections
   pop.projections.sorted <- pop.projections[-1, ] # Remove the USA row
-  print("here!!!")
-  print(pop.projections.sorted$Isocode)
-  print(isos.tmp)
-  print(pop.projections.sorted$Isocode == isos.tmp)
   stopifnot(all(pop.projections.sorted$Isocode == isos.tmp))
   
   stopifnot(all(gdp.projections$Isocode == isos.tmp))
@@ -1222,7 +1224,7 @@ fit.project.model <- function(data.medium, year.start=2010, year.end=2100,
     # with gamma
     #CHANGE
     #corr.model.out <- fit.corr.model.ar1(data.medium, 
-    corr.model.out <- fit.corr.model.ar1(data.medium, 
+    corr.model.out <- fit.corr.model.ar1(data.medium.tmp, 
                                          isos.remove=c("USA", rejects.late, rejects.insuf), max.vals,
                                          n.iterations=n.iter, n.adapt=n.burnin, n.chains=5,
                                          thin=thin,
@@ -1252,14 +1254,8 @@ fit.project.model <- function(data.medium, year.start=2010, year.end=2100,
   print("======================================")
   print("Fitting the population model and getting population trajectories!")
   print("")
-  if (year.start == 2010 & year.end == 2100) {
-    # gives preds.countries.trajs
-    load(paste0(data.location, "poppreds_formatted_2010_2100.rda"))
-  } else if (year.start == 2000 & year.end == 2010) {
-    load(paste0(data.location, "poppreds_formatted_2000_2010.rda"))
-  } else {
-    load(paste0(data.location, "poppreds_formatted_",
-                year.start, "_", year.end, ".rda"))
+  preds.countries.trajs <- 
+    loadRData(paste0(data.location, "poppreds_formatted_", year.start, "_", year.end, ".rda"))
     # preds.countries.tmp <- predict.population(year.present=year.start, year.end=year.end, 
     #                                           make.new=FALSE)
     # #                                            n.iter=500, n.burnin=100)
