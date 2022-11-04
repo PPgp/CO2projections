@@ -1266,7 +1266,7 @@ fit.project.model <- function(data.medium, year.start=2010, year.end=2100,
     #              n.trajectories, " trajectories."))
     # preds.countries.trajs <- find.pop.trajectories(data.medium.tmp, pred.pop, 1:n.trajectories,
     #                                                c("USA", names.countries), year.start=year.start, year.end=year.end)
-  }
+  # }
   
   # These functions are from estimate_model_corr.R
   print("======================================")
